@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     PROXY_URL: str
     ASSISTANT_ID: str
+    TEMP_DIR: str
 
     class Config:
         env_file = ".env"

@@ -11,25 +11,30 @@ client = openai.AsyncOpenAI(
     http_client=httpx.AsyncClient(proxy=settings.PROXY_URL)
 )
 
-async def download_voice(file_url: str) -> bytes:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(file_url) as response:
-            return await response.read()
-
-async def transcribe_audio(file_data: bytes) -> str:
-    file_stream = io.BytesIO(file_data)
-    file_stream.name = "voice.ogg"
-
+async def download_and_save_voice(file_url: str, save_path: str):
     try:
-        response = await client.audio.transcriptions.create(
-            model="whisper-1",
-            file=file_stream,
-            language="ru"
-        )
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as response:
+                with open(save_path, "wb") as f:
+                    f.write(await response.read())
+        logging.info(f"Голосовое сообщение сохранено: {save_path}")
+    except Exception as e:
+        logging.error(f"Ошибка при скачивании голосового сообщения: {e}")
+
+
+async def transcribe_audio(file_path: str) -> str:
+    try:
+        with open(file_path, "rb") as file_stream:
+            response = await client.audio.transcriptions.create(
+                model="whisper-1",
+                file=file_stream,
+                language="ru"
+            )
+
         logging.info(f"Ответ Whisper API: {response}")
         return response.text
     except Exception as e:
-        logging.info("Ошибка при распознавании:", e)
+        logging.error(f"Ошибка при распознавании аудио: {e}")
         return "Ошибка при распознавании аудио"
 
 
@@ -54,7 +59,7 @@ async def get_assistant_response(user_message: str) -> str:
             if messages.data:
                 return messages.data[0].content[0].text.value
 
-        return f"AI пока думает, cтатус: {run.status}"
+        return f"Ai не смог сгенерировать ответ {run.status}"
 
     except Exception as e:
         logging.error("Ошибка при получении ответа от Assistant API:", e)

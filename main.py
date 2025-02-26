@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message
 from aiogram.filters import Command
@@ -14,6 +16,8 @@ dp.include_router(router)
 
 async def main():
     logging.info("Бот запущен")
+    os.makedirs(settings.TEMP_DIR, exist_ok=True)
+    logging.info("СОздана временная директроия для голосовых файлов")
     await dp.start_polling(bot)
 
 @dp.message(Command("start"))
