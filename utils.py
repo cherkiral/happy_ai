@@ -33,20 +33,6 @@ async def transcribe_audio(file_data: bytes) -> str:
         return "Ошибка при распознавании аудио"
 
 
-async def wait_for_completion(thread_id: str, run_id: str) -> None:
-    while True:
-        run_status = await client.beta.threads.runs.retrieve(
-            thread_id=thread_id,
-            run_id=run_id
-        )
-
-        if run_status.status == "completed":
-            return
-        elif run_status.status in ["failed", "cancelled"]:
-            raise Exception("Ошибка: Ассистент не смог ответить.")
-
-        await asyncio.sleep(1)
-
 async def get_assistant_response(user_message: str) -> str:
     try:
         thread = await client.beta.threads.create()
@@ -57,23 +43,18 @@ async def get_assistant_response(user_message: str) -> str:
             content=user_message
         )
 
-        run = await client.beta.threads.runs.create(
+        run = await client.beta.threads.runs.create_and_poll(
             thread_id=thread.id,
             assistant_id=settings.ASSISTANT_ID
         )
-        logging.info(f"Запущен ассистент ID: {run.id}")
 
-        await wait_for_completion(thread.id, run.id)
+        if run.status == "completed":
+            messages = await client.beta.threads.messages.list(thread_id=thread.id)
 
-        messages = await client.beta.threads.messages.list(thread_id=thread.id)
+            if messages.data:
+                return messages.data[0].content[0].text.value
 
-        if not messages.data:
-            return "Ошибка: AI не прислал ответ."
-
-        assistant_response = messages.data[0].content[0].text.value
-
-        logging.info(f"Ответ Assistant API: {assistant_response}")
-        return assistant_response
+        return f"AI пока думает, cтатус: {run.status}"
 
     except Exception as e:
         logging.error("Ошибка при получении ответа от Assistant API:", e)
