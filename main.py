@@ -1,9 +1,8 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message, BufferedInputFile
+from aiogram.types import Message
 from aiogram.filters import Command
-from database import init_db
 from config import settings
 from handlers import router
 
@@ -14,7 +13,6 @@ dp = Dispatcher()
 dp.include_router(router)
 
 async def main():
-    await init_db()
     logging.info("Бот запущен")
     await dp.start_polling(bot)
 
