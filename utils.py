@@ -64,12 +64,16 @@ async def get_assistant_response(user_message: str) -> str:
 async def text_to_speech(text: str) -> bytes:
     try:
         response = await client.audio.speech.create(
-            model="tts-1-hd",
+            model="tts-1",
             voice="alloy",
             input=text
         )
 
         audio_data = await response.aread()
+
+        if not audio_data or len(audio_data) == 0:
+            logging.error("OpenAI TTS вернул пустой аудиофайл!")
+            return None
 
         return audio_data
 
