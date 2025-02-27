@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     PROXY_URL: str
     ASSISTANT_ID: str
-    TEMP_DIR: str
+    TEMP_DIR: str = "temp_audio"
 
     class Config:
         env_file = ".env"
