@@ -1,1 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+logs/
+*.log
 .env
+*.db
+*.sqlite
+alembic.ini
+alembic/env.py
+*.pid

@@ -1,10 +1,9 @@
-import asyncio
-import io
 import logging
 import aiohttp
 import httpx
 import openai
-from config import settings
+from app.config.config import settings
+from app.utils.ai_services import validate_value_completion
 
 client = openai.AsyncOpenAI(
     api_key=settings.OPENAI_API_KEY,
@@ -38,34 +37,6 @@ async def transcribe_audio(file_path: str) -> str:
         return "Ошибка при распознавании аудио"
 
 
-async def get_assistant_response(user_message: str) -> str:
-    try:
-        thread = await client.beta.threads.create()
-
-        await client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=user_message
-        )
-
-        run = await client.beta.threads.runs.create_and_poll(
-            thread_id=thread.id,
-            assistant_id=settings.ASSISTANT_ID
-        )
-
-        if run.status == "completed":
-            messages = await client.beta.threads.messages.list(thread_id=thread.id)
-
-            if messages.data:
-                return messages.data[0].content[0].text.value
-
-        return f"Ai не смог сгенерировать ответ {run.status}"
-
-    except Exception as e:
-        logging.error("Ошибка при получении ответа от Assistant API:", e)
-        return "Ошибка при обработке запроса"
-
-
 async def text_to_speech(text: str) -> bytes:
     try:
         response = await client.audio.speech.create(
@@ -85,3 +56,32 @@ async def text_to_speech(text: str) -> bytes:
     except Exception as e:
         logging.error(f"Ошибка при генерации озвучки: {e}")
         return None
+
+async def process_and_save_values(extracted_values: str):
+    valid_values = []
+    rejected_values = []
+
+    for value in extracted_values.split(", "):
+        is_valid = await validate_value_completion(value)
+        if is_valid:
+            valid_values.append(value)
+        else:
+            rejected_values.append(value)
+
+    response_message = ""
+
+    if valid_values:
+        response_message = f"**Добавлены ценности:** {', '.join(valid_values)}"
+    else:
+        response_message = "**Все найденные ценности были отклонены.**"
+
+    if rejected_values:
+        response_message += f"\n**Отклонены:** {', '.join(rejected_values)}"
+
+    return ", ".join(valid_values), response_message
+
+
+
+async def create_thread():
+    thread = await client.beta.threads.create()
+    return thread.id
