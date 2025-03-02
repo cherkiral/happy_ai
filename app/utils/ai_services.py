@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import json
 import openai
@@ -9,7 +10,7 @@ client = openai.AsyncOpenAI(
     http_client=httpx.AsyncClient(proxy=settings.PROXY_URL)
 )
 
-async def get_assistant_response(user_message: str, thread_id: str) -> str:
+async def get_assistant_response(user_message: str, thread_id: str):
     try:
         await client.beta.threads.messages.create(
             thread_id=thread_id,
@@ -23,58 +24,56 @@ async def get_assistant_response(user_message: str, thread_id: str) -> str:
         )
 
         if run.status == "completed":
-            messages = await client.beta.threads.messages.list(thread_id=thread_id)
+            return await fetch_latest_response(thread_id), None
 
-            if messages.data:
-                return messages.data[0].content[0].text.value
+        if run.status == "requires_action":
+            tool_calls = run.required_action.model_dump().get("submit_tool_outputs", {}).get("tool_calls", [])
+            extracted_values = []
+            tool_outputs = []
 
-        return f"Ai не смог сгенерировать ответ {run.status}"
-
-    except Exception as e:
-        logging.error("Ошибка при получении ответа от Assistant API:", e)
-        return "Ошибка при обработке запроса"
-
-
-async def extract_assistant_value(thread_id: str):
-    try:
-        runs = await client.beta.threads.runs.list(thread_id=thread_id)
-
-        if not runs.data:
-            return None
-
-        latest_run = runs.data[0]
-
-        if latest_run.status != "requires_action":
-            return None
-
-        required_action = latest_run.required_action.dict()
-        tool_calls = required_action.get("submit_tool_outputs", {}).get("tool_calls", [])
-
-        tool_outputs = []
-        extracted_values = []
-
-        for tool in tool_calls:
-            function_name = tool["function"]["name"]
-            function_args = tool["function"]["arguments"]
-
-            if function_name == "save_value":
-                extracted_value = json.loads(function_args).get("value")
+            for tool in tool_calls:
+                extracted_value = json.loads(tool["function"]["arguments"]).get("value")
                 if extracted_value:
                     extracted_values.append(extracted_value)
                 tool_outputs.append({"tool_call_id": tool["id"], "output": json.dumps({"success": True})})
 
-        if tool_outputs:
-            await client.beta.threads.runs.submit_tool_outputs(
-                thread_id=thread_id,
-                run_id=latest_run.id,
-                tool_outputs=tool_outputs
-            )
+            if tool_outputs:
+                await client.beta.threads.runs.submit_tool_outputs(
+                    thread_id=thread_id,
+                    run_id=run.id,
+                    tool_outputs=tool_outputs
+                )
 
-        return ", ".join(extracted_values) if extracted_values else None
+            run = await wait_for_active_run_to_complete(thread_id)
+
+            if run.status == "completed":
+                return await fetch_latest_response(thread_id), ", ".join(extracted_values) if extracted_values else None
+
+        return f"AI не смог обработать запрос. Статус: {run.status}", None
 
     except Exception as e:
-        logging.error(f"Ошибка при проверке значений Assistant API: {e}")
-        return None
+        return "Ошибка при обработке запроса", None
+
+
+async def wait_for_active_run_to_complete(thread_id: str):
+    while True:
+        runs = await client.beta.threads.runs.list(thread_id=thread_id)
+        active_run = next((r for r in runs.data if r.status in ["in_progress", "queued"]), None)
+
+        if not active_run:
+            return await client.beta.threads.runs.create_and_poll(
+                thread_id=thread_id,
+                assistant_id=settings.ASSISTANT_ID
+            )
+
+        await asyncio.sleep(2)
+
+
+async def fetch_latest_response(thread_id: str):
+    messages = await client.beta.threads.messages.list(thread_id=thread_id)
+    latest_message = next((msg.content[0].text.value for msg in messages.data if msg.role == "assistant"), None)
+    return latest_message if latest_message else "AI не смог сгенерировать ответ."
+
 
 async def validate_value_completion(value: str) -> bool:
     try:

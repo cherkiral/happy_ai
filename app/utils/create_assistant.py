@@ -32,7 +32,7 @@ async def create_assistant():
                 }
             }
         ],
-        model="gpt-4-turbo"
+        model="gpt-4o"
     )
     return assistant.id
 

@@ -8,7 +8,7 @@ from aiogram.types import Message, BufferedInputFile, ReplyKeyboardMarkup, Keybo
 from app.database.crud.users import UserRepository
 from app.database.crud.messages import MessageRepository
 from app.utils.utils import transcribe_audio, download_and_save_voice, text_to_speech, process_and_save_values
-from app.utils.ai_services import get_assistant_response, extract_assistant_value
+from app.utils.ai_services import get_assistant_response
 from app.config.config import settings
 
 
@@ -30,7 +30,6 @@ def get_main_menu():
 @router.message(F.voice)
 async def voice_message_handler(message: Message):
     tg_id = message.from_user.id
-
     user = await user_repo.create_user(tg_id)
 
     unique_filename = f"{uuid.uuid4()}.ogg"
@@ -51,21 +50,19 @@ async def voice_message_handler(message: Message):
 
     waiting_msg = await message.answer("AI генерирует ответ...")
 
-    assistant_response = await get_assistant_response(transcribed_text, user.thread_id)
+    assistant_response, extracted_value = await get_assistant_response(transcribed_text, user.thread_id)
 
     await message.answer(assistant_response)
     await waiting_msg.delete()
 
-    if user and user.thread_id:
-        extracted_value = await extract_assistant_value(user.thread_id)
+    if extracted_value:
+        valid_values, response_message = await process_and_save_values(extracted_value)
 
-        if extracted_value:
-            valid_values, response_message = await process_and_save_values(extracted_value)
+        if valid_values:
+            await user_repo.update_user_values(user.id, valid_values)
+            await message.answer(f"Найдены ваши ценности: {valid_values}")
 
-            if valid_values:
-                await user_repo.update_user_values(user.id, valid_values)
-
-            await message.answer(response_message)
+        await message.answer(response_message)
 
     waiting_voice_msg = await message.answer("AI создает голосовое сообщение...")
 
