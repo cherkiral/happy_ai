@@ -7,7 +7,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, BufferedInputFile, ReplyKeyboardMarkup, KeyboardButton
 from app.database.crud.users import UserRepository
 from app.database.crud.messages import MessageRepository
-from app.utils.utils import transcribe_audio, download_and_save_voice, text_to_speech, process_and_save_values
+from app.utils.utils import transcribe_audio, download_and_save_voice, text_to_speech, process_values
 from app.utils.ai_services import get_assistant_response
 from app.config.config import settings
 
@@ -56,7 +56,7 @@ async def voice_message_handler(message: Message):
     await waiting_msg.delete()
 
     if extracted_value:
-        valid_values, response_message = await process_and_save_values(extracted_value)
+        valid_values, response_message = await process_values(extracted_value)
 
         if valid_values:
             await user_repo.update_user_values(user.id, valid_values)

@@ -57,7 +57,7 @@ async def text_to_speech(text: str) -> bytes:
         logging.error(f"Ошибка при генерации озвучки: {e}")
         return None
 
-async def process_and_save_values(extracted_values: str):
+async def process_values(extracted_values: str):
     valid_values = []
     rejected_values = []
 
