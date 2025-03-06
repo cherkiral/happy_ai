@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     PROXY_URL: str
     ASSISTANT_ID: str
     TEMP_DIR: str
+    AMPLITUDE_API_KEY: str
 
     POSTGRES_DB: str
     POSTGRES_USER: str

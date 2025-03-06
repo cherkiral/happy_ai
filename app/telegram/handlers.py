@@ -7,6 +7,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, BufferedInputFile, ReplyKeyboardMarkup, KeyboardButton
 from app.database.crud.users import UserRepository
 from app.database.crud.messages import MessageRepository
+from app.utils.amplitude import log_event_to_amplitude
+from app.utils.photoes import download_and_save_image, encode_image, analyze_photo_with_openai
 from app.utils.utils import transcribe_audio, download_and_save_voice, text_to_speech, process_values
 from app.utils.ai_services import get_assistant_response
 from app.config.config import settings
@@ -43,6 +45,9 @@ async def voice_message_handler(message: Message):
 
     transcribed_text = await transcribe_audio(temp_path)
     await message.answer(f"Распознанный текст: {transcribed_text}")
+
+    log_event_to_amplitude("voice_message_sent", tg_id, {"message": transcribed_text})
+
     await message_repo.save_user_message(tg_id, transcribed_text)
 
     os.remove(temp_path)
@@ -73,9 +78,40 @@ async def voice_message_handler(message: Message):
     await waiting_voice_msg.delete()
 
 
+@router.message(F.photo)
+async def photo_handler(message: Message):
+    tg_id = message.from_user.id
+    photo = message.photo[-1]
+    file_info = await message.bot.get_file(photo.file_id)
+    file_url = f"https://api.telegram.org/file/bot{message.bot.token}/{file_info.file_path}"
+
+    log_event_to_amplitude("photo_sent", tg_id)
+
+    unique_filename = f"{uuid.uuid4()}.jpg"
+    save_path = os.path.join(settings.TEMP_DIR, unique_filename)
+
+    await download_and_save_image(file_url, save_path)
+
+    bs64_photo = await encode_image(save_path)
+
+    waiting_msg = await message.answer("AI пытается определить эмоцию")
+
+    emotion = await analyze_photo_with_openai(bs64_photo)
+
+    await waiting_msg.delete()
+
+    await message.answer(f"Эмоция на фото: {emotion}")
+
+    os.remove(save_path)
+
+
+
 @router.message(F.text == "Мои последние 10 сообщений")
 async def last_messages_handler(message: Message):
     tg_id = message.from_user.id
+
+    log_event_to_amplitude("request_10_last_messages", tg_id, {"message": "Мои последние 10 сообщений"})
+
     messages = await message_repo.get_last_messages(tg_id)
 
     if messages:
@@ -88,6 +124,9 @@ async def last_messages_handler(message: Message):
 @router.message(F.text == "Мой thread_id")
 async def get_thread_handler(message: Message):
     tg_id = message.from_user.id
+
+    log_event_to_amplitude("request_my_thread_id", tg_id, {"message": "Мой thread_id"})
+
     user_id = await user_repo.get_or_create_thread(tg_id)
 
     await message.answer(f"**Ваш thread_id:**\n\n{user_id}")
@@ -95,6 +134,9 @@ async def get_thread_handler(message: Message):
 @router.message(F.text == "Мои ценности")
 async def my_values_handler(message: Message):
     tg_id = message.from_user.id
+
+    log_event_to_amplitude("request_user_values", tg_id, {"message": "Мои ценности"})
+
     values = await user_repo.get_user_values(tg_id)
 
     await message.answer(f"**Ваши ценности:**\n\n{values}")
@@ -102,6 +144,9 @@ async def my_values_handler(message: Message):
 @router.message(F.text == "Удалить мои ценности")
 async def delete_values_handler(message: Message):
     tg_id = message.from_user.id
+
+    log_event_to_amplitude("request_delete_user_values", tg_id, {"message": "Удалить мои ценности"})
+
     await user_repo.delete_user_values(tg_id)
 
     await message.answer(f"**Ваши ценности удалены**")
@@ -109,6 +154,8 @@ async def delete_values_handler(message: Message):
 @router.message(F.text == "Обновить мой thread_id")
 async def refresh_thread_handler(message: Message):
     tg_id = message.from_user.id
+
+    log_event_to_amplitude("request_refresh_user_thread_id", tg_id, {"message": "Обновить мой thread_id"})
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
