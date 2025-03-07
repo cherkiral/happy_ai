@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     REDIS_HOST: str
     REDIS_PORT: int
+    REDIS_PASSWORD: str
 
     DOCKER_MODE: str
 

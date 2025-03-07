@@ -14,7 +14,10 @@ from app.telegram.handlers import router
 
 logging.basicConfig(level=logging.INFO)
 
-redis = aioredis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
+redis = aioredis.from_url(
+    f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}",
+    password=settings.REDIS_PASSWORD
+)
 
 storage = RedisStorage(redis=redis)
 
