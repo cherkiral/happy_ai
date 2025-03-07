@@ -1,9 +1,12 @@
 import asyncio
 import logging
 import os
+import redis.asyncio as aioredis
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand
+from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.utils.keyboard import ReplyKeyboardMarkup, KeyboardButton
 from app.config.config import settings
 from app.database.crud.users import UserRepository
@@ -11,8 +14,12 @@ from app.telegram.handlers import router
 
 logging.basicConfig(level=logging.INFO)
 
+redis = aioredis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
+
+storage = RedisStorage(redis=redis)
+
 bot = Bot(token=settings.BOT_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(storage=storage)
 user_repo = UserRepository()
 
 def get_main_menu():
@@ -34,10 +41,13 @@ async def set_main_menu():
     await bot.set_my_commands(commands)
 
 @dp.message(Command("start"))
-async def start_handler(message):
+async def start_handler(message, state: FSMContext):
     tg_id = message.from_user.id
 
-    await user_repo.create_user(tg_id)
+    user = await user_repo.create_user(tg_id)
+
+    await state.update_data(thread_id=user.thread_id)
+
     await message.answer("Привет! Я AI-бот. Отправь мне голосовое или текст, а я помогу!", reply_markup=get_main_menu())
 
 async def main():

@@ -5,6 +5,7 @@ import uuid
 from aiogram import Router, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, BufferedInputFile, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.fsm.context import FSMContext
 from app.database.crud.users import UserRepository
 from app.database.crud.messages import MessageRepository
 from app.utils.amplitude import log_event_to_amplitude
@@ -32,7 +33,7 @@ def get_main_menu():
 @router.message(F.voice)
 async def voice_message_handler(message: Message):
     tg_id = message.from_user.id
-    user = await user_repo.create_user(tg_id)
+    user = await user_repo.get_by_tg_id(tg_id)
 
     unique_filename = f"{uuid.uuid4()}.ogg"
     temp_path = os.path.join(settings.TEMP_DIR, unique_filename)
@@ -122,14 +123,19 @@ async def last_messages_handler(message: Message):
     await message.answer(f"**Ваши последние 10 сообщений:**\n\n{messages_text}")
 
 @router.message(F.text == "Мой thread_id")
-async def get_thread_handler(message: Message):
+async def get_thread_handler(message: Message, state: FSMContext):
     tg_id = message.from_user.id
 
     log_event_to_amplitude("request_my_thread_id", tg_id, {"message": "Мой thread_id"})
 
-    user_id = await user_repo.get_or_create_thread(tg_id)
+    user_data = await state.get_data()
+    thread_id = user_data.get("thread_id")
 
-    await message.answer(f"**Ваш thread_id:**\n\n{user_id}")
+    if not thread_id:
+        thread_id = await user_repo.get_or_create_thread(tg_id)
+        await state.update_data(thread_id=thread_id)
+
+    await message.answer(f"**Ваш thread_id:**\n\n{thread_id}")
 
 @router.message(F.text == "Мои ценности")
 async def my_values_handler(message: Message):
@@ -172,10 +178,11 @@ async def refresh_thread_handler(message: Message):
 
 
 @router.callback_query(F.data.startswith("confirm_refresh_"))
-async def confirm_refresh_callback(callback_query):
+async def confirm_refresh_callback(callback_query, state: FSMContext):
     tg_id = int(callback_query.data.split("_")[-1])
 
     new_thread = await user_repo.refresh_user_thread(tg_id)
+    await state.update_data(thread_id=new_thread)
     await user_repo.delete_user_values(tg_id)
 
     await callback_query.message.edit_text(f"**Ваш thread_id обновлен:**\n\n{new_thread}")

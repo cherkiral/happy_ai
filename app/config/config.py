@@ -19,12 +19,16 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int
     POSTGRES_HOST: str
 
+    REDIS_HOST: str
+    REDIS_PORT: int
+
     DOCKER_MODE: str
 
     #Чтобы не менять каждый раз локалхост на дб
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.POSTGRES_HOST = os.getenv("POSTGRES_HOST") if self.DOCKER_MODE.lower() == "true" else "localhost"
+        self.REDIS_HOST = os.getenv("REDIS_HOST") if self.DOCKER_MODE.lower() == "true" else "localhost"
 
     @property
     def DATABASE_URL(self) -> str:

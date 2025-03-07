@@ -30,6 +30,9 @@ async def create_assistant():
                         "required": ["value"]
                     }
                 }
+            },
+            {
+                "type": "file_search"
             }
         ],
         model="gpt-4o"
