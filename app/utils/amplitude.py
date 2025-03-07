@@ -5,7 +5,7 @@ from app.config.config import settings
 
 executor = ThreadPoolExecutor(max_workers=5)
 
-amplitude_client = Amplitude("789ce7dc13f64ec5569c8e810875c094")
+amplitude_client = Amplitude(settings.AMPLITUDE_API_KEY)
 
 def send_amplitude_event(event_type: str, user_telegram_id: int, event_properties: dict = None):
     try:

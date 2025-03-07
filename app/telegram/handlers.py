@@ -8,9 +8,9 @@ from aiogram.types import Message, BufferedInputFile, ReplyKeyboardMarkup, Keybo
 from app.database.crud.users import UserRepository
 from app.database.crud.messages import MessageRepository
 from app.utils.amplitude import log_event_to_amplitude
-from app.utils.photoes import download_and_save_image, encode_image, analyze_photo_with_openai
-from app.utils.utils import transcribe_audio, download_and_save_voice, text_to_speech, process_values
-from app.utils.ai_services import get_assistant_response
+from app.utils.utils import transcribe_audio, download_and_save_voice, text_to_speech, process_values, \
+    download_and_save_image, encode_image
+from app.utils.ai_services import get_assistant_response, analyze_photo_with_openai
 from app.config.config import settings
 
 

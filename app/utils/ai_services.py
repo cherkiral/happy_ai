@@ -110,3 +110,27 @@ async def validate_value_completion(value: str) -> bool:
     except Exception as e:
         logging.error(f"Ошибка при валидации значения '{value}': {e}")
         return False
+
+
+async def analyze_photo_with_openai(base64_image: bytes) -> str:
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Ты эксперт в анализе человеческих эмоций по фото. "
+                                "Определи настроение человека по выражению его лица. "
+                                "Ответ должен быть одним словом, например: радость, грусть, удивление, злость, страх, нейтральное, и т.д.",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    },
+                ],
+            }
+        ],
+    )
+    return response.choices[0].message.content.strip()

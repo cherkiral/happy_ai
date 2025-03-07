@@ -1,3 +1,4 @@
+import base64
 import logging
 import aiohttp
 import httpx
@@ -81,7 +82,24 @@ async def process_values(extracted_values: str):
     return ", ".join(valid_values), response_message
 
 
-
 async def create_thread():
     thread = await client.beta.threads.create()
     return thread.id
+
+
+async def download_and_save_image(file_url: str, save_path: str):
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as response:
+                if response.status == 200:
+                    with open(save_path, "wb") as f:
+                        f.write(await response.read())
+                    logging.info(f"Изображение сохранено: {save_path}")
+                else:
+                    logging.error(f"Ошибка при скачивании изображения, статус код: {response.status}")
+    except Exception as e:
+        logging.error(f"Ошибка при скачивании изображения: {e}")
+
+async def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode("utf-8")
